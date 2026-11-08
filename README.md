@@ -53,7 +53,7 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 | `per-run-cap` | `0.50` | Maximum LLM spend in USD for one scan. The CLI refuses to start a scan whose estimate is above the cap, and stops a scan whose real spend reaches it. |
 | `skip-judged` | `false` | Without a judge key, run only the probes decided by deterministic checks and report the judged ones as `skipped`. Without it, a scan that selects judged probes and has no key exits 1. |
 | `upload-sarif` | `true` | Upload the report to code scanning. Ignored unless `format` is `sarif`. |
-| `argus-version` | `1.5.0` | Version of `argus-probe` to install from PyPI. |
+| `argus-version` | `1.6.0` | Version of `argus-probe` to install from PyPI. |
 | `install-spec` | `''` | Space-separated pip specs to install instead of `argus-probe[local]==<argus-version>`, for example a git URL or a wheel path. |
 | `python-version` | `3.11` | Python version passed to `actions/setup-python`. |
 
@@ -66,7 +66,7 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 
 ## Versions
 
-`@v2` installs argus-probe 1.5.0 by default. Set `argus-version` to install a different version.
+`@v2` installs argus-probe 1.6.0 by default. Set `argus-version` to install a different version.
 
 `@v1` installs argus-probe 0.4.0. With `@v2`, a scan in which any probe errored exits 1. HTTP 401, 404, and 429 from the target count as errors. A scan without a judge key that selects judged probes exits 1 unless you set `skip-judged: true`. `@v1` stays on 0.4.0. See the [0.7.0 release notes](https://github.com/gy15901580825/Argus/releases/tag/v0.7.0).
 
