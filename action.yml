@@ -36,7 +36,7 @@ inputs:
   argus-version:
     description: "argus-probe version to install from PyPI."
     required: false
-    default: "1.13.1"
+    default: "1.14.0"
   skip-judged:
     description: "Without a judge key, run only the probes decided by deterministic checks and report the rest as skipped. Without this, a scan that selects judged probes and has no key exits 1."
     required: false
@@ -95,6 +95,16 @@ runs:
         ARGUS_SKIP_JUDGED: ${{ inputs.skip-judged }}
       run: |
         set -uo pipefail
+        want=""
+        out_lc="${ARGUS_OUTPUT,,}"
+        case "${ARGUS_FORMAT,,}" in
+          sarif) [[ "$out_lc" == *.sarif ]] || want=".sarif" ;;
+          html) [[ "$out_lc" == *.html || "$out_lc" == *.htm ]] || want=".html" ;;
+          junit) [[ "$out_lc" == *.xml ]] || want=".xml" ;;
+        esac
+        if [ -n "$want" ]; then
+          echo "::warning::output $ARGUS_OUTPUT does not match format $ARGUS_FORMAT; set output to a $want file, for example argus$want"
+        fi
         args=(run --local --target "$ARGUS_TARGET" --probes "$ARGUS_PROBES"
               --format "$ARGUS_FORMAT" --out "$ARGUS_OUTPUT")
         if [ -n "$ARGUS_PER_RUN_CAP" ]; then
