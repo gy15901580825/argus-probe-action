@@ -96,8 +96,9 @@ runs:
       run: |
         set -uo pipefail
         want=""
-        out_lc="${ARGUS_OUTPUT,,}"
-        case "${ARGUS_FORMAT,,}" in
+        out_lc=$(printf '%s' "$ARGUS_OUTPUT" | tr '[:upper:]' '[:lower:]')
+        fmt_lc=$(printf '%s' "$ARGUS_FORMAT" | tr '[:upper:]' '[:lower:]')
+        case "$fmt_lc" in
           sarif) [[ "$out_lc" == *.sarif ]] || want=".sarif" ;;
           html) [[ "$out_lc" == *.html || "$out_lc" == *.htm ]] || want=".html" ;;
           junit) [[ "$out_lc" == *.xml ]] || want=".xml" ;;
