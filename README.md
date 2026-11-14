@@ -48,12 +48,12 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 | `target` | (required) | Path to the target spec JSON file. |
 | `probes` | `owasp_01_prompt_injection_basic,owasp_07_system_prompt_leakage` | Comma-separated probe ids, or `all`. |
 | `format` | `sarif` | Report format: `sarif`, `html` or `junit`. |
-| `output` | `argus.sarif` | Path of the report file. |
+| `output` | `argus.sarif` | Path of the report file. Give it the extension that matches `format`: `.sarif`, `.html` or `.xml` for `junit`. When they differ, the action still writes the file at this path and shows a warning on the run page. |
 | `fail-on` | `critical` | Fail the job when a probe fails with this severity or higher (`info`, `low`, `medium`, `high`, `critical`). Set it to `''` to turn the gate off. |
 | `per-run-cap` | `0.50` | Maximum LLM spend in USD for one scan. The CLI refuses to start a scan whose estimate is above the cap, and stops a scan whose real spend reaches it. |
 | `skip-judged` | `false` | Without a judge key, run only the probes decided by deterministic checks and report the judged ones as `skipped`. Without it, a scan that selects judged probes and has no key exits 1. |
 | `upload-sarif` | `true` | Upload the report to code scanning. Ignored unless `format` is `sarif`. |
-| `argus-version` | `1.13.1` | Version of `argus-probe` to install from PyPI. |
+| `argus-version` | `1.14.0` | Version of `argus-probe` to install from PyPI. |
 | `install-spec` | `''` | Space-separated pip specs to install instead of `argus-probe[local]==<argus-version>`, for example a git URL or a wheel path. |
 | `python-version` | `3.11` | Python version passed to `actions/setup-python`. |
 
@@ -66,7 +66,7 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 
 ## Versions
 
-`@v2` installs argus-probe 1.13.1 by default. Set `argus-version` to install a different version.
+`@v2` installs argus-probe 1.14.0 by default. Set `argus-version` to install a different version.
 
 `@v1` installs argus-probe 0.4.0. With `@v2`, a scan in which any probe errored exits 1. HTTP 401, 404, and 429 from the target count as errors. A scan without a judge key that selects judged probes exits 1 unless you set `skip-judged: true`. `@v1` stays on 0.4.0. See the [0.7.0 release notes](https://github.com/gy15901580825/Argus/releases/tag/v0.7.0).
 
