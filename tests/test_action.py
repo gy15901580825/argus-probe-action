@@ -22,7 +22,7 @@ def step(name, tmp_path, **overrides):
                GITHUB_STEP_SUMMARY=str(tmp_path / 'summary'), ARGUS_OUTPUT=str(tmp_path / 'report'),
                ARGUS_FORMAT='json', ARGUS_BASELINE='', ARGUS_TARGET=str(tmp_path / 'target.json'),
                ARGUS_PROBES='unknown_probe', ARGUS_FAIL_ON='critical', ARGUS_PER_RUN_CAP='0.50',
-               ARGUS_SKIP_JUDGED='false', SCAN_EXIT_CODE='3', ARGUS_RUN_JSON='',
+               ARGUS_SKIP_JUDGED='false', SCAN_EXIT_CODE='3',
                ARGUS_SARIF_CATEGORY='argus-probe')
     env.update(overrides)
     return subprocess.run(['bash', '-c', config['run']], cwd=tmp_path, env=env,
@@ -60,11 +60,23 @@ def test_summary_counts_and_failures(tmp_path, run, format):
         assert 'run.json' in summary and '1.18.0' in summary
 
 
-def test_missing_report_is_unknown_not_pass(tmp_path):
-    result = step('Summarize scan', tmp_path, SCAN_EXIT_CODE='2')
+@pytest.mark.parametrize('format', ['json', 'sarif', 'html', 'junit'])
+def test_missing_report_is_unknown_not_pass(tmp_path, format):
+    result = step('Summarize scan', tmp_path, SCAN_EXIT_CODE='2', ARGUS_FORMAT=format)
     assert result.returncode == 0
-    assert outputs(tmp_path)['total'] == ''
+    assert all(value == '' for value in outputs(tmp_path).values())
     assert 'Counts unavailable' in (tmp_path / 'summary').read_text()
+
+
+@pytest.mark.parametrize('format', ['json', 'sarif', 'html', 'junit'])
+def test_unreadable_report_is_unknown_not_pass(tmp_path, format):
+    (tmp_path / 'report').write_text('Incomplete report')
+    result = step('Summarize scan', tmp_path, ARGUS_FORMAT=format)
+    assert result.returncode == 0
+    assert all(value == '' for value in outputs(tmp_path).values())
+    summary = (tmp_path / 'summary').read_text()
+    assert 'Counts unavailable' in summary
+    assert 'No failing probes' not in summary
 
 
 def test_baseline_reaches_installed_cli(tmp_path):
@@ -73,6 +85,19 @@ def test_baseline_reaches_installed_cli(tmp_path):
                   ARGUS_PROBES='owasp_01_prompt_injection_basic')
     assert outputs(tmp_path)['exit-code'] == '2'
     assert '--baseline' in result.stderr and 'cannot read run.json' in result.stderr
+
+
+def test_scan_invokes_cli_once(tmp_path):
+    cli = tmp_path / 'argus-probe'
+    cli.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> calls\nexit 3\n')
+    cli.chmod(0o755)
+    result = step('Run argus-probe', tmp_path, ARGUS_FORMAT='sarif',
+                  PATH=str(tmp_path) + os.pathsep + os.environ['PATH'])
+    assert result.returncode == 0, result.stderr
+    calls = (tmp_path / 'calls').read_text().splitlines()
+    assert len(calls) == 1
+    assert calls[0].startswith('run --local ')
+    assert outputs(tmp_path)['exit-code'] == '3'
 
 
 def test_category_and_upload_default():
@@ -103,16 +128,6 @@ def test_ci_and_transitive_actions_pinned():
             continue
         sha = ref.split('@')[1]
         assert len(sha) == 40 and all(c in '0123456789abcdef' for c in sha)
-
-
-def test_json_companion_preferred(tmp_path, run):
-    companion = tmp_path / 'run.json'
-    companion.write_text(json.dumps(run))
-    (tmp_path / 'report').write_text('HTML cannot be read')
-    result = step('Summarize scan', tmp_path, ARGUS_FORMAT='html', ARGUS_RUN_JSON=str(companion))
-    assert result.returncode == 0
-    assert outputs(tmp_path)['total'] == '7'
-    assert 'unavailable' not in (tmp_path / 'summary').read_text()
 
 
 def test_html_evidence_does_not_inflate_counts(tmp_path, run):

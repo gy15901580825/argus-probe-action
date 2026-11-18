@@ -79,7 +79,7 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 
 Count outputs are empty when no readable report is available. An empty count does not mean zero. The summary says what is missing and shows the scan exit code. Counts describe all findings; use `exit-code` to decide whether the CLI's severity and baseline gate tripped.
 
-With `format: json`, the action reads the run.json directly. CLI 1.18.0 writes only one format per scan, so the action reads SARIF, HTML or JUnit when those are requested and states that run.json is missing. It does not run probes again to produce JSON. For a newer CLI whose `run --help` advertises `--also-out FORMAT=PATH`, it requests a JSON companion at `<output>.run.json` in the same scan and reads that file. `upload-report` uploads only the requested report.
+With `format: json`, the action reads the run.json directly. CLI 1.18.0 writes only one format per scan, so the action reads SARIF, HTML or JUnit when those are requested and states that run.json is missing. Verdict counts are available from each of these formats in CLI 1.18.0. If a report cannot provide counts, the outputs stay empty and the summary says so. Use `format: json` to save a baseline and show its comparison in the summary. The action runs one scan and `upload-report` uploads the requested report.
 
 Later steps can read the outputs even when the gate trips:
 

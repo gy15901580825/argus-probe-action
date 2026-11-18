@@ -92,9 +92,6 @@ def safe(value):
 def main():
     report = Path(os.environ['ARGUS_OUTPUT'])
     format = os.environ['ARGUS_FORMAT'].lower()
-    run_json = os.environ.get('ARGUS_RUN_JSON', '')
-    source = Path(run_json) if run_json else report
-    source_format = 'json' if run_json else format
     code = os.environ.get('SCAN_EXIT_CODE') or 'unavailable (scan did not run)'
     lines = ['## Argus scan', '', f"Target: <code>{safe(os.environ['ARGUS_TARGET'])}</code>", '',
              f'Exit code: {safe(code)}', '', f'Report path: <code>{safe(report)}</code>', '']
@@ -104,9 +101,9 @@ def main():
     values = {output: '' for output in VERDICTS.values()}
     values['total'] = ''
     try:
-        findings = read_report(source, source_format)
-        if source_format == 'json':
-            record = json.loads(source.read_text(encoding='utf-8'))
+        findings = read_report(report, format)
+        if format == 'json':
+            record = json.loads(report.read_text(encoding='utf-8'))
             if record.get('incomplete_reason'):
                 lines += [f"Incomplete run: {safe(record['incomplete_reason'])}", '']
             comparison = record.get('baseline')
@@ -132,7 +129,7 @@ def main():
     except (OSError, ValueError, KeyError, TypeError, ET.ParseError) as exc:
         lines += [f'Counts unavailable: {safe(exc)}. Check the scan log and report path.']
         print('::warning::Argus counts unavailable; check the job summary and scan log.')
-    if source_format != 'json':
+    if format != 'json':
         lines += ['', 'run.json is unavailable. The installed CLI (1.18.0 by default) writes one format per scan. '
                   'Counts above come from the requested report; a full run record and JSON baseline comparison '
                   'are missing. Use format: json to save a baseline without another scan.']

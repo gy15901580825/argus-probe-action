@@ -158,22 +158,12 @@ runs:
         if [ -n "$ARGUS_BASELINE" ]; then
           args+=(--baseline "$ARGUS_BASELINE")
         fi
-        # Newer CLIs can write a JSON companion without a second scan.
-        run_json=""
-        if [ "$fmt_lc" != "json" ]; then
-          help=$(argus-probe run --help)
-          if [[ "$help" == *"--also-out"* ]]; then
-            run_json="$ARGUS_OUTPUT.run.json"
-            args+=(--also-out "json=$run_json")
-          fi
-        fi
         code=0
         argus-probe "${args[@]}" || code=$?
         echo "argus-probe exited with code $code"
         {
           echo "exit-code=$code"
           echo "report=$ARGUS_OUTPUT"
-          echo "run-json=$run_json"
         } >> "$GITHUB_OUTPUT"
 
     - name: Summarize scan
@@ -185,7 +175,6 @@ runs:
         ARGUS_FORMAT: ${{ inputs.format }}
         ARGUS_OUTPUT: ${{ inputs.output }}
         ARGUS_BASELINE: ${{ inputs.baseline }}
-        ARGUS_RUN_JSON: ${{ steps.scan.outputs.run-json }}
         SCAN_EXIT_CODE: ${{ steps.scan.outputs.exit-code }}
       run: python "$GITHUB_ACTION_PATH/scripts/summarize.py"
 
