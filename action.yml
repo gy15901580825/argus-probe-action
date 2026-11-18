@@ -14,7 +14,7 @@ inputs:
     required: false
     default: "owasp_01_prompt_injection_basic,owasp_07_system_prompt_leakage"
   format:
-    description: "Report format: sarif, html or junit."
+    description: "Report format: sarif, html, junit or json."
     required: false
     default: "sarif"
   output:
@@ -33,6 +33,18 @@ inputs:
     description: "Upload the report to GitHub code scanning. Only used when format is sarif."
     required: false
     default: "true"
+  baseline:
+    description: "Path to an earlier run.json. Gates only on new failures. Leave empty on the first run; a missing file exits 2."
+    required: false
+    default: ""
+  sarif-category:
+    description: "Code scanning category. Use a distinct category for each matrix target. Also used in the report artifact name."
+    required: false
+    default: "argus-probe"
+  upload-report:
+    description: "Upload the report file as a workflow artifact before applying the gate."
+    required: false
+    default: "false"
   argus-version:
     description: "argus-probe version to install from PyPI."
     required: false
@@ -57,12 +69,36 @@ outputs:
   report:
     description: "Path of the report file."
     value: ${{ steps.scan.outputs.report }}
+  passed:
+    description: "Number of pass verdicts; empty if counts are unavailable."
+    value: ${{ steps.summary.outputs.passed }}
+  failed:
+    description: "Number of fail verdicts, including existing baseline failures."
+    value: ${{ steps.summary.outputs.failed }}
+  warned:
+    description: "Number of warn verdicts."
+    value: ${{ steps.summary.outputs.warned }}
+  errored:
+    description: "Number of error verdicts."
+    value: ${{ steps.summary.outputs.errored }}
+  skipped:
+    description: "Number of skipped verdicts."
+    value: ${{ steps.summary.outputs.skipped }}
+  blocked-by-target:
+    description: "Number of blocked_by_target verdicts."
+    value: ${{ steps.summary.outputs.blocked-by-target }}
+  aborted-cost:
+    description: "Number of aborted_cost verdicts."
+    value: ${{ steps.summary.outputs.aborted-cost }}
+  total:
+    description: "Number of findings across all verdicts; empty if counts are unavailable."
+    value: ${{ steps.summary.outputs.total }}
 
 runs:
   using: composite
   steps:
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: ${{ inputs.python-version }}
 
@@ -93,6 +129,7 @@ runs:
         ARGUS_FAIL_ON: ${{ inputs.fail-on }}
         ARGUS_PER_RUN_CAP: ${{ inputs.per-run-cap }}
         ARGUS_SKIP_JUDGED: ${{ inputs.skip-judged }}
+        ARGUS_BASELINE: ${{ inputs.baseline }}
       run: |
         set -uo pipefail
         want=""
@@ -102,6 +139,7 @@ runs:
           sarif) [[ "$out_lc" == *.sarif ]] || want=".sarif" ;;
           html) [[ "$out_lc" == *.html || "$out_lc" == *.htm ]] || want=".html" ;;
           junit) [[ "$out_lc" == *.xml ]] || want=".xml" ;;
+          json) [[ "$out_lc" == *.json ]] || want=".json" ;;
         esac
         if [ -n "$want" ]; then
           echo "::warning::output $ARGUS_OUTPUT does not match format $ARGUS_FORMAT; set output to a $want file, for example argus$want"
@@ -117,6 +155,9 @@ runs:
         if [ "$ARGUS_SKIP_JUDGED" = "true" ]; then
           args+=(--skip-judged)
         fi
+        if [ -n "$ARGUS_BASELINE" ]; then
+          args+=(--baseline "$ARGUS_BASELINE")
+        fi
         code=0
         argus-probe "${args[@]}" || code=$?
         echo "argus-probe exited with code $code"
@@ -124,6 +165,27 @@ runs:
           echo "exit-code=$code"
           echo "report=$ARGUS_OUTPUT"
         } >> "$GITHUB_OUTPUT"
+
+    - name: Summarize scan
+      id: summary
+      if: always()
+      shell: bash
+      env:
+        ARGUS_TARGET: ${{ inputs.target }}
+        ARGUS_FORMAT: ${{ inputs.format }}
+        ARGUS_OUTPUT: ${{ inputs.output }}
+        ARGUS_BASELINE: ${{ inputs.baseline }}
+        SCAN_EXIT_CODE: ${{ steps.scan.outputs.exit-code }}
+      run: python "$GITHUB_ACTION_PATH/scripts/summarize.py"
+
+    - name: Upload report artifact
+      if: always() && inputs.upload-report == 'true'
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: argus-report-${{ inputs.sarif-category }}
+        path: ${{ inputs.output }}
+        if-no-files-found: warn
+        include-hidden-files: true
 
     - name: Check SARIF report
       id: sarif
@@ -147,10 +209,10 @@ runs:
 
     - name: Upload SARIF to code scanning
       if: always() && steps.sarif.outputs.upload == 'true'
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3
       with:
         sarif_file: ${{ inputs.output }}
-        category: argus-probe
+        category: ${{ inputs.sarif-category }}
 
     - name: Apply fail-on gate
       if: always()
