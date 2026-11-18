@@ -1,0 +1,99 @@
+name: Test action
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        format: [json, sarif, html, junit]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: Start bundled quickstart demo
+        shell: bash
+        run: |
+          unset ANTHROPIC_API_KEY OPENAI_API_KEY AZURE_OPENAI_API_KEY AZURE_API_KEY
+          python -m pip install 'argus-probe[local]==1.18.0'
+          mkdir -p .scratch
+          nohup python scripts/demo.py > .scratch/demo.log 2>&1 &
+          for attempt in {1..60}; do
+            if [ -f .scratch/ready ]; then exit 0; fi
+            sleep 1
+          done
+          cat .scratch/demo.log
+          exit 1
+      - name: Read demo probes
+        id: demo
+        shell: bash
+        run: echo "probes=$(cat .scratch/probes.txt)" >> "$GITHUB_OUTPUT"
+      - name: Scan demo
+        id: scan
+        continue-on-error: true
+        uses: ./
+        env:
+          ANTHROPIC_API_KEY: ''
+          OPENAI_API_KEY: ''
+          AZURE_OPENAI_API_KEY: ''
+          AZURE_API_KEY: ''
+        with:
+          target: .scratch/target.json
+          probes: ${{ steps.demo.outputs.probes }}
+          format: ${{ matrix.format }}
+          output: .scratch/report.${{ matrix.format }}
+          sarif-category: demo-${{ matrix.format }}
+          upload-sarif: ${{ matrix.format == 'sarif' && github.event_name == 'push' }}
+          upload-report: 'true'
+      - name: Assert outputs and summary
+        if: always()
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.scan.outputs.exit-code }}
+          REPORT: ${{ steps.scan.outputs.report }}
+          TOTAL: ${{ steps.scan.outputs.total }}
+          PASSED: ${{ steps.scan.outputs.passed }}
+          FAILED: ${{ steps.scan.outputs.failed }}
+          WARNED: ${{ steps.scan.outputs.warned }}
+          ERRORED: ${{ steps.scan.outputs.errored }}
+          SKIPPED: ${{ steps.scan.outputs.skipped }}
+          BLOCKED: ${{ steps.scan.outputs.blocked-by-target }}
+          ABORTED: ${{ steps.scan.outputs.aborted-cost }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          assert os.environ['EXIT_CODE'] == '3', os.environ['EXIT_CODE']
+          assert Path(os.environ['REPORT']).is_file()
+          assert int(os.environ['TOTAL']) == 16
+          assert int(os.environ['FAILED']) > 0
+          assert int(os.environ['ERRORED']) == 0
+          assert sum(int(os.environ[key]) for key in
+                     ['PASSED', 'FAILED', 'WARNED', 'ERRORED', 'SKIPPED', 'BLOCKED', 'ABORTED']) == 16
+          summaries = [p.read_text() for p in Path(os.environ['RUNNER_TEMP']).rglob('*step_summary*') if p.is_file()]
+          summary = next(s for s in summaries if '## Argus scan' in s)
+          assert 'mcp_credential_lure_api_key' in summary and 'critical' in summary
+          assert 'Exit code: 3' in summary and os.environ['REPORT'] in summary
+          PY
+      - name: Test regression cases
+        shell: bash
+        run: |
+          unset ANTHROPIC_API_KEY OPENAI_API_KEY AZURE_OPENAI_API_KEY AZURE_API_KEY
+          python -m pip install pytest pyyaml
+          python -m pytest tests/ --basetemp=.scratch/pytest -q
+      - name: Stop demo
+        if: always()
+        shell: bash
+        run: touch .scratch/stop
