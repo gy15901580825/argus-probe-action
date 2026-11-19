@@ -57,7 +57,7 @@ def test_summary_counts_and_failures(tmp_path, run, format):
     assert str(tmp_path / 'report') in summary
     assert 'Exit code: 3' in summary
     if format != 'json':
-        assert 'run.json' in summary and '1.18.0' in summary
+        assert 'run.json' in summary and '1.19.0' in summary
 
 
 @pytest.mark.parametrize('format', ['json', 'sarif', 'html', 'junit'])
@@ -79,12 +79,22 @@ def test_unreadable_report_is_unknown_not_pass(tmp_path, format):
     assert 'No failing probes' not in summary
 
 
-def test_baseline_reaches_installed_cli(tmp_path):
-    (tmp_path / 'target.json').write_text('{"kind":"openai_compat","endpoint_url":"http://127.0.0.1:1/v1/chat/completions","model":"test"}')
-    result = step('Run argus-probe', tmp_path, ARGUS_BASELINE=str(tmp_path / 'missing.json'),
-                  ARGUS_PROBES='owasp_01_prompt_injection_basic')
-    assert outputs(tmp_path)['exit-code'] == '2'
-    assert '--baseline' in result.stderr and 'cannot read run.json' in result.stderr
+@pytest.mark.parametrize(('fail_on', 'exit_code'), [('', '0'), ('critical', '3')])
+def test_missing_baseline_uses_normal_gate(tmp_path, fail_on, exit_code):
+    from argus.demo import bypass_proxy_for_localhost
+    from argus.demo.servers import start_mcp_demo
+
+    bypass_proxy_for_localhost()
+    with start_mcp_demo() as spec:
+        (tmp_path / 'target.json').write_text(json.dumps(spec))
+        result = step('Run argus-probe', tmp_path, ARGUS_BASELINE=str(tmp_path / 'missing.json'),
+                      ARGUS_PROBES='mcp_credential_lure_api_key', ARGUS_FAIL_ON=fail_on)
+    assert result.returncode == 0, result.stderr
+    assert outputs(tmp_path)['exit-code'] == exit_code
+    assert 'Note: --baseline' in result.stderr and 'using an empty baseline' in result.stderr
+    report = json.loads((tmp_path / 'report').read_text())
+    assert report['baseline']['new']
+    assert any(f['verdict'] == 'fail' for f in report['findings'])
 
 
 def test_scan_invokes_cli_once(tmp_path):
@@ -111,7 +121,7 @@ def test_existing_defaults_unchanged():
     defaults = {
         'target': None, 'probes': 'owasp_01_prompt_injection_basic,owasp_07_system_prompt_leakage',
         'format': 'sarif', 'output': 'argus.sarif', 'fail-on': 'critical', 'per-run-cap': '0.50',
-        'upload-sarif': 'true', 'argus-version': '1.18.0', 'skip-judged': 'false',
+        'upload-sarif': 'true', 'argus-version': '1.19.0', 'skip-judged': 'false',
         'install-spec': '', 'python-version': '3.11',
     }
     for name, default in defaults.items():
