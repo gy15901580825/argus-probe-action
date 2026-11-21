@@ -55,10 +55,10 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 | `per-run-cap` | `0.50` | Maximum LLM spend in USD for one scan. The CLI refuses to start a scan whose estimate is above the cap, and stops a scan whose real spend reaches it. |
 | `skip-judged` | `false` | Without a judge key, run only the probes decided by deterministic checks and report the judged ones as `skipped`. Without it, a scan that selects judged probes and has no key exits 1. |
 | `upload-sarif` | `true` | Upload the report to code scanning. Ignored unless `format` is `sarif`. |
-| `baseline` | `''` | Earlier run.json for the same target and mode. Passes `--baseline` to the CLI so `fail-on` gates only on new failing probe ids. In 1.19.0, a missing local file is treated as an empty baseline and prints a note, so you can use the same path on the first run. An invalid file exits 2. |
+| `baseline` | `''` | Earlier run.json for the same target and mode. Passes `--baseline` to the CLI so `fail-on` gates only on new failing probe ids. From 1.19.0, a missing local file is treated as an empty baseline and prints a note, so you can use the same path on the first run. An invalid file exits 2. |
 | `sarif-category` | `argus-probe` | Code scanning category. Give every matrix target a different value. Also used as the suffix of the report artifact name, so use simple names without slashes or other artifact filename characters. |
 | `upload-report` | `false` | Upload the requested report with `actions/upload-artifact`, even when the gate trips. The artifact is named `argus-report-<sarif-category>`. A missing file produces a warning. |
-| `argus-version` | `1.19.0` | Version of `argus-probe` to install from PyPI. |
+| `argus-version` | `1.19.1` | Version of `argus-probe` to install from PyPI. |
 | `install-spec` | `''` | Space-separated pip specs to install instead of `argus-probe[local]==<argus-version>`, for example a git URL or a wheel path. |
 | `python-version` | `3.11` | Python version passed to `actions/setup-python`. |
 
@@ -79,7 +79,7 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 
 Count outputs are empty when no readable report is available. An empty count does not mean zero. The summary says what is missing and shows the scan exit code. Counts describe all findings; use `exit-code` to decide whether the CLI's severity and baseline gate tripped.
 
-With `format: json`, the action reads the run.json directly. CLI 1.19.0 writes only one format per scan, so the action reads SARIF, HTML or JUnit when those are requested and states that run.json is missing. Verdict counts are available from each of these formats in CLI 1.19.0. If a report cannot provide counts, the outputs stay empty and the summary says so. Use `format: json` to save a baseline and show its comparison in the summary. The action runs one scan and `upload-report` uploads the requested report.
+With `format: json`, the action reads the run.json directly. CLI 1.19.0 and later write only one format per scan, so the action reads SARIF, HTML or JUnit when those are requested and states that run.json is missing. Verdict counts are available from each of these formats in CLI 1.19.0 and later. If a report cannot provide counts, the outputs stay empty and the summary says so. Use `format: json` to save a baseline and show its comparison in the summary. The action runs one scan and `upload-report` uploads the requested report.
 
 Later steps can read the outputs even when the gate trips:
 
@@ -100,7 +100,7 @@ Later steps can read the outputs even when the gate trips:
 
 Save a JSON report from the default branch with `format: json`, `output: run.json`, `upload-sarif: 'false'` and `upload-report: 'true'`. Set `fail-on: ''` on that baseline-building scan if you want to save existing findings without failing the default-branch job. Restore that report before the PR scan, then set `baseline` to its path and `fail-on` to the severity you want to block.
 
-CLI 1.19.0 validates the baseline before scanning. A missing local baseline file is treated as an empty baseline and prints a note. You can set `baseline` to the intended path on the first run; the usual severity gate applies until a baseline exists. An invalid baseline is still a usage error (exit 2). The baseline must describe the same target and mode. A probe that already failed in the baseline does not trip the gate, even if its severity rises. Errors and incomplete scans still fail the action.
+CLI 1.19.0 and later validate the baseline before scanning. A missing local baseline file is treated as an empty baseline and prints a note. You can set `baseline` to the intended path on the first run; the usual severity gate applies until a baseline exists. An invalid baseline is still a usage error (exit 2). The baseline must describe the same target and mode. A probe that already failed in the baseline does not trip the gate, even if its severity rises. Errors and incomplete scans still fail the action.
 
 This PR example downloads the last successful baseline workflow run on `main`. It needs `actions: read` as well as `contents: read`. Keep the baseline-building workflow name and artifact category consistent with the download command. Use the default branch name for your repository.
 
@@ -127,7 +127,7 @@ This PR example downloads the last successful baseline workflow run on `main`. I
     upload-sarif: 'false'
 ```
 
-An expired or unavailable artifact makes the restore step fail so the workflow does not accidentally substitute a different baseline. If no baseline run exists yet, the empty output omits `--baseline`. JSON is the one-scan baseline recipe for the default CLI version. A SARIF or HTML scan can compare against an existing JSON baseline, but 1.19.0 cannot also write a new run.json from that scan.
+An expired or unavailable artifact makes the restore step fail so the workflow does not accidentally substitute a different baseline. If no baseline run exists yet, the empty output omits `--baseline`. JSON is the one-scan baseline recipe for the default CLI version. A SARIF or HTML scan can compare against an existing JSON baseline, but CLI 1.19.0 and later cannot also write a new run.json from that scan.
 
 ## Scan several targets
 
@@ -159,7 +159,7 @@ Each matrix job writes its own summary and exposes its own step outputs. For bas
 
 ## Versions
 
-`@v2` installs argus-probe 1.19.0 by default. Set `argus-version` to install a different version.
+`@v2` installs argus-probe 1.19.1 by default. Set `argus-version` to install a different version.
 
 `@v1` installs argus-probe 0.4.0. With `@v2`, a scan in which any probe errored exits 1. HTTP 401, 404, and 429 from the target count as errors. A scan without a judge key that selects judged probes exits 1 unless you set `skip-judged: true`. `@v1` stays on 0.4.0. See the [0.7.0 release notes](https://github.com/gy15901580825/Argus/releases/tag/v0.7.0).
 
