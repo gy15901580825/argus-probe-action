@@ -58,7 +58,7 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 | `baseline` | `''` | Earlier run.json for the same target and mode. Passes `--baseline` to the CLI so `fail-on` gates only on new failing probe ids. From 1.19.0, a missing local file is treated as an empty baseline and prints a note, so you can use the same path on the first run. An invalid file exits 2. |
 | `sarif-category` | `argus-probe` | Code scanning category. Give every matrix target a different value. Also used as the suffix of the report artifact name, so use simple names without slashes or other artifact filename characters. |
 | `upload-report` | `false` | Upload the requested report with `actions/upload-artifact`, even when the gate trips. The artifact is named `argus-report-<sarif-category>`. A missing file produces a warning. |
-| `argus-version` | `1.19.1` | Version of `argus-probe` to install from PyPI. |
+| `argus-version` | `1.20.0` | Version of `argus-probe` to install from PyPI. |
 | `install-spec` | `''` | Space-separated pip specs to install instead of `argus-probe[local]==<argus-version>`, for example a git URL or a wheel path. |
 | `python-version` | `3.11` | Python version passed to `actions/setup-python`. |
 
@@ -159,7 +159,7 @@ Each matrix job writes its own summary and exposes its own step outputs. For bas
 
 ## Versions
 
-`@v2` installs argus-probe 1.19.1 by default. Set `argus-version` to install a different version.
+`@v2` installs argus-probe 1.20.0 by default. Set `argus-version` to install a different version. The nine document-injection probes in 1.20.0 are opt-in and selected by ID through the existing `probes` input, for example `doc_injection_invoice_payee_swap_en`.
 
 `@v1` installs argus-probe 0.4.0. With `@v2`, a scan in which any probe errored exits 1. HTTP 401, 404, and 429 from the target count as errors. A scan without a judge key that selects judged probes exits 1 unless you set `skip-judged: true`. `@v1` stays on 0.4.0. See the [0.7.0 release notes](https://github.com/gy15901580825/Argus/releases/tag/v0.7.0).
 
