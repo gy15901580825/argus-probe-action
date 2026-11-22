@@ -57,7 +57,7 @@ def test_summary_counts_and_failures(tmp_path, run, format):
     assert str(tmp_path / 'report') in summary
     assert 'Exit code: 3' in summary
     if format != 'json':
-        assert 'run.json' in summary and '1.20.0' in summary
+        assert 'run.json' in summary and '1.21.0' in summary
 
 
 @pytest.mark.parametrize('format', ['json', 'sarif', 'html', 'junit'])
@@ -121,7 +121,7 @@ def test_existing_defaults_unchanged():
     defaults = {
         'target': None, 'probes': 'owasp_01_prompt_injection_basic,owasp_07_system_prompt_leakage',
         'format': 'sarif', 'output': 'argus.sarif', 'fail-on': 'critical', 'per-run-cap': '0.50',
-        'upload-sarif': 'true', 'argus-version': '1.20.0', 'skip-judged': 'false',
+        'upload-sarif': 'true', 'argus-version': '1.21.0', 'skip-judged': 'false',
         'install-spec': '', 'python-version': '3.11',
     }
     for name, default in defaults.items():

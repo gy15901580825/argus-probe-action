@@ -130,7 +130,7 @@ def main():
         lines += [f'Counts unavailable: {safe(exc)}. Check the scan log and report path.']
         print('::warning::Argus counts unavailable; check the job summary and scan log.')
     if format != 'json':
-        lines += ['', 'run.json is unavailable. The installed CLI (1.20.0 by default) writes one format per scan. '
+        lines += ['', 'run.json is unavailable. The installed CLI (1.21.0 by default) writes one format per scan. '
                   'Counts above come from the requested report; a full run record and JSON baseline comparison '
                   'are missing. Use format: json to save a baseline without another scan.']
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
