@@ -159,7 +159,7 @@ Each matrix job writes its own summary and exposes its own step outputs. For bas
 
 ## Versions
 
-`@v2` installs argus-probe 1.21.0 by default. Set `argus-version` to install a different version. The nine document-injection probes in 1.20.0 are opt-in and selected by ID through the existing `probes` input, for example `doc_injection_invoice_payee_swap_en`. A target spec may declare an optional `domain` (for example `financial-services`) to add that domain's probes to the run.
+`@v2` installs argus-probe 1.21.0 by default. Set `argus-version` to install a different version. The nine document-injection probes added in 1.20.0 are opt-in and selected by ID through the existing `probes` input, for example `doc_injection_invoice_payee_swap_en`. A target spec may declare an optional `domain` (for example `financial-services`) to add that domain's probes to the run.
 
 `@v1` installs argus-probe 0.4.0. With `@v2`, a scan in which any probe errored exits 1. HTTP 401, 404, and 429 from the target count as errors. A scan without a judge key that selects judged probes exits 1 unless you set `skip-judged: true`. `@v1` stays on 0.4.0. See the [0.7.0 release notes](https://github.com/gy15901580825/Argus/releases/tag/v0.7.0).
 
