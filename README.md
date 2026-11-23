@@ -1,6 +1,6 @@
 # Argus agent red-team scan
 
-This action runs [Argus](https://github.com/gy15901580825/Argus) red-team probes against your AI agent from inside your CI job. It installs the `argus-probe` CLI, runs `argus-probe run --local` against the target you describe in a JSON file, and writes a report. With the default SARIF format it uploads the report to GitHub code scanning, so findings show up in the Security tab and on pull requests. The job fails when a probe fails at or above the `fail-on` severity. The SARIF upload happens before the job fails, so you still see the findings. The action also writes verdict counts and the top failing probes to the workflow run summary.
+This action runs [Argus](https://github.com/gy15901580825/Argus) red-team probes against your AI agent from inside your CI job. It installs the `argus-probe` CLI, runs `argus-probe run --local` against the target you describe in a JSON file, and writes a report. With the default SARIF format it uploads the report to GitHub code scanning. In CLI 1.22.0, only failed and warning probes become alerts in the Security tab, with one alert per probe and a `security-severity` score for low through critical findings. Passing and skipped probes are not alerts; their counts remain in the job summary and count outputs. Pull-request annotations appear only when the alert's location in the target spec file is part of the PR diff. The job fails when a probe fails at or above the `fail-on` severity. The SARIF upload happens before the job fails, so you still see the findings. The action also writes verdict counts and the top failing probes to the workflow run summary.
 
 The job summary, count outputs, `baseline`, `sarif-category` and `upload-report` are available from v2.15.0.
 
@@ -56,9 +56,9 @@ A minimal `.argus/target.json` for an OpenAI-compatible endpoint:
 | `skip-judged` | `false` | Without a judge key, run only the probes decided by deterministic checks and report the judged ones as `skipped`. Without it, a scan that selects judged probes and has no key exits 1. |
 | `upload-sarif` | `true` | Upload the report to code scanning. Ignored unless `format` is `sarif`. |
 | `baseline` | `''` | Earlier run.json for the same target and mode. Passes `--baseline` to the CLI so `fail-on` gates only on new failing probe ids. From 1.19.0, a missing local file is treated as an empty baseline and prints a note, so you can use the same path on the first run. An invalid file exits 2. |
-| `sarif-category` | `argus-probe` | Code scanning category. Give every matrix target a different value. Also used as the suffix of the report artifact name, so use simple names without slashes or other artifact filename characters. |
+| `sarif-category` | `argus-probe` | Code scanning category. The action always passes this value to the upload, so it determines the code-scanning category instead of the category the CLI writes into the SARIF. Give every matrix target a different value. Also used as the suffix of the report artifact name, so use simple names without slashes or other artifact filename characters. |
 | `upload-report` | `false` | Upload the requested report with `actions/upload-artifact`, even when the gate trips. The artifact is named `argus-report-<sarif-category>`. A missing file produces a warning. |
-| `argus-version` | `1.21.1` | Version of `argus-probe` to install from PyPI. |
+| `argus-version` | `1.22.0` | Version of `argus-probe` to install from PyPI. |
 | `install-spec` | `''` | Space-separated pip specs to install instead of `argus-probe[local]==<argus-version>`, for example a git URL or a wheel path. |
 | `python-version` | `3.11` | Python version passed to `actions/setup-python`. |
 
@@ -159,7 +159,7 @@ Each matrix job writes its own summary and exposes its own step outputs. For bas
 
 ## Versions
 
-`@v2` installs argus-probe 1.21.1 by default. Set `argus-version` to install a different version. The nine document-injection probes added in 1.20.0 are opt-in and selected by ID through the existing `probes` input, for example `doc_injection_invoice_payee_swap_en`. A target spec may declare an optional `domain` (for example `financial-services`) to add that domain's probes to the run.
+`@v2` installs argus-probe 1.22.0 by default. Set `argus-version` to install a different version. The nine document-injection probes added in 1.20.0 are opt-in and selected by ID through the existing `probes` input, for example `doc_injection_invoice_payee_swap_en`. A target spec may declare an optional `domain` (for example `financial-services`) to add that domain's probes to the run.
 
 `@v1` installs argus-probe 0.4.0. With `@v2`, a scan in which any probe errored exits 1. HTTP 401, 404, and 429 from the target count as errors. A scan without a judge key that selects judged probes exits 1 unless you set `skip-judged: true`. `@v1` stays on 0.4.0. See the [0.7.0 release notes](https://github.com/gy15901580825/Argus/releases/tag/v0.7.0).
 
