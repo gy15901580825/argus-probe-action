@@ -116,7 +116,7 @@ def main():
             runs = json.loads(report.read_text(encoding='utf-8')).get('runs', [])
             verdict_counts = runs[0].get('properties', {}).get('verdict_counts') if runs else None
             if isinstance(verdict_counts, dict):
-                counts = Counter(verdict_counts)
+                counts = Counter({verdict: verdict_counts.get(verdict, 0) for verdict in VERDICTS})
         if counts.keys() - VERDICTS.keys():
             raise ValueError('Report contains verdicts this action does not recognize')
         values.update({output: str(counts[verdict]) for verdict, output in VERDICTS.items()})

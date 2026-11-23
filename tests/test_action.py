@@ -61,7 +61,8 @@ def test_summary_counts_and_failures(tmp_path, run, format):
 
 
 @pytest.mark.parametrize(('verdict_counts', 'total'), [
-    ({'pass': 3, 'fail': 7, 'warn': 0, 'error': 0, 'skipped': 2}, '12'),
+    ({'fail': 7, 'warn': 0, 'pass': 3, 'error': 0, 'skipped': 2,
+      'blocked_by_target': 0, 'aborted_cost': 0, 'escalated': 1}, '12'),
     ({'pass': 3, 'fail': 7, 'skipped': 2}, '12'),
     ({}, '0'),
 ])
