@@ -190,6 +190,26 @@ def test_html_evidence_does_not_inflate_counts(tmp_path, run):
     assert outputs(tmp_path)['failed'] == '1'
 
 
+@pytest.mark.parametrize('judge_model', [None, 'test-judge'])
+def test_html_counts_ignore_nested_evidence(tmp_path, run, judge_model):
+    for finding in run['findings']:
+        finding['judge_model'] = judge_model
+    run['findings'][1]['evidence'] = {'scenario': {
+        'outcome': 'test', 'touch': 'test', 'observation_complete': True,
+        'evidence': [], 'objects': [], 'gaps': [],
+    }}
+    (tmp_path / 'report').write_text(render_html(run))
+    result = step('Summarize scan', tmp_path, ARGUS_FORMAT='html')
+    assert result.returncode == 0, result.stderr
+    assert outputs(tmp_path) == {
+        'passed': '1', 'failed': '1', 'warned': '1', 'errored': '1',
+        'skipped': '1', 'blocked-by-target': '1', 'aborted-cost': '1', 'total': '7',
+    }
+    summary = (tmp_path / 'summary').read_text()
+    assert '| probe_fail | critical |' in summary
+    assert 'Integration scenario' not in summary
+
+
 def test_missing_scan_code_fails_gate(tmp_path):
     result = step('Apply fail-on gate', tmp_path, SCAN_EXIT_CODE='')
     assert result.returncode == 1

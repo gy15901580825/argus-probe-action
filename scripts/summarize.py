@@ -17,19 +17,18 @@ class FindingHeaders(HTMLParser):
     """Only read finding headings, never nested evidence or attacker content."""
     def __init__(self):
         super().__init__()
-        self.depth = 0
-        self.finding_depth = None
+        self.containers = []
         self.heading = False
         self.text = []
         self.findings = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag == 'div':
-            self.depth += 1
-            if attrs.get('class') == 'finding':
-                self.finding_depth = self.depth
-        if tag == 'h3' and self.finding_depth == self.depth:
+        if tag in ('div', 'details', 'summary'):
+            self.containers.append((tag, 'finding' in attrs.get('class', '').split()))
+        finding_header = (self.containers[-1:] == [('div', True)] or
+                          self.containers[-2:] == [('details', True), ('summary', False)])
+        if tag == 'h3' and finding_header:
             self.heading = True
             self.text = []
 
@@ -39,16 +38,14 @@ class FindingHeaders(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag == 'h3' and self.heading:
-            match = re.fullmatch(r'(.+?)\s+—\s+(\w+)\s+·\s+(\w+)\s+·\s+confidence\s+\S+', ''.join(self.text).strip())
+            match = re.fullmatch(r'(.+?)\s+—\s+(\w+)\s+·\s+(\w+)(?:\s+·\s+confidence\s+\S+)?', ''.join(self.text).strip())
             if not match:
                 raise ValueError('HTML finding heading is not supported')
             probe, verdict, severity = match.groups()
             self.findings.append({'probe_id': probe, 'verdict': verdict, 'severity': severity})
             self.heading = False
-        if tag == 'div':
-            if self.finding_depth == self.depth:
-                self.finding_depth = None
-            self.depth -= 1
+        if tag in ('div', 'details', 'summary') and self.containers:
+            self.containers.pop()
 
 
 def read_report(path, format):
