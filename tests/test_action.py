@@ -57,7 +57,49 @@ def test_summary_counts_and_failures(tmp_path, run, format):
     assert str(tmp_path / 'report') in summary
     assert 'Exit code: 3' in summary
     if format != 'json':
-        assert 'run.json' in summary and '1.21.1' in summary
+        assert 'run.json' in summary and '1.22.0' in summary
+
+
+@pytest.mark.parametrize(('verdict_counts', 'total'), [
+    ({'fail': 7, 'warn': 0, 'pass': 3, 'error': 0, 'skipped': 2,
+      'blocked_by_target': 0, 'aborted_cost': 0, 'escalated': 1}, '12'),
+    ({'pass': 3, 'fail': 7, 'skipped': 2}, '12'),
+    ({}, '0'),
+])
+def test_sarif_counts_from_metadata(tmp_path, verdict_counts, total):
+    report = {'runs': [{
+        'properties': {'verdict_counts': verdict_counts},
+        'results': [{'ruleId': f'probe_fail_{i}',
+                     'properties': {'verdict': 'fail', 'severity': 'critical'}}
+                    for i in range(7)],
+    }]}
+    (tmp_path / 'report').write_text(json.dumps(report))
+    result = step('Summarize scan', tmp_path, ARGUS_FORMAT='sarif')
+    assert result.returncode == 0, result.stderr
+    assert outputs(tmp_path) == {
+        'passed': str(verdict_counts.get('pass', 0)),
+        'failed': str(verdict_counts.get('fail', 0)),
+        'warned': '0', 'errored': '0',
+        'skipped': str(verdict_counts.get('skipped', 0)),
+        'blocked-by-target': '0', 'aborted-cost': '0', 'total': total,
+    }
+    summary = (tmp_path / 'summary').read_text()
+    assert f'| total | {total} |' in summary
+    assert all(f'probe_fail_{i}' in summary for i in range(7))
+
+
+def test_legacy_sarif_counts_from_results(tmp_path, run):
+    report = {'runs': [{'results': [
+        {'ruleId': f['probe_id'], 'properties': f} for f in run['findings']
+    ]}]}
+    (tmp_path / 'report').write_text(json.dumps(report))
+    result = step('Summarize scan', tmp_path, ARGUS_FORMAT='sarif')
+    assert result.returncode == 0, result.stderr
+    assert outputs(tmp_path) == {
+        'passed': '1', 'failed': '1', 'warned': '1', 'errored': '1',
+        'skipped': '1', 'blocked-by-target': '1', 'aborted-cost': '1', 'total': '7',
+    }
+    assert 'probe_fail' in (tmp_path / 'summary').read_text()
 
 
 @pytest.mark.parametrize('format', ['json', 'sarif', 'html', 'junit'])
@@ -121,7 +163,7 @@ def test_existing_defaults_unchanged():
     defaults = {
         'target': None, 'probes': 'owasp_01_prompt_injection_basic,owasp_07_system_prompt_leakage',
         'format': 'sarif', 'output': 'argus.sarif', 'fail-on': 'critical', 'per-run-cap': '0.50',
-        'upload-sarif': 'true', 'argus-version': '1.21.1', 'skip-judged': 'false',
+        'upload-sarif': 'true', 'argus-version': '1.22.0', 'skip-judged': 'false',
         'install-spec': '', 'python-version': '3.11',
     }
     for name, default in defaults.items():
@@ -146,6 +188,26 @@ def test_html_evidence_does_not_inflate_counts(tmp_path, run):
     result = step('Summarize scan', tmp_path, ARGUS_FORMAT='html')
     assert result.returncode == 0
     assert outputs(tmp_path)['failed'] == '1'
+
+
+@pytest.mark.parametrize('judge_model', [None, 'test-judge'])
+def test_html_counts_ignore_nested_evidence(tmp_path, run, judge_model):
+    for finding in run['findings']:
+        finding['judge_model'] = judge_model
+    run['findings'][1]['evidence'] = {'scenario': {
+        'outcome': 'test', 'touch': 'test', 'observation_complete': True,
+        'evidence': [], 'objects': [], 'gaps': [],
+    }}
+    (tmp_path / 'report').write_text(render_html(run))
+    result = step('Summarize scan', tmp_path, ARGUS_FORMAT='html')
+    assert result.returncode == 0, result.stderr
+    assert outputs(tmp_path) == {
+        'passed': '1', 'failed': '1', 'warned': '1', 'errored': '1',
+        'skipped': '1', 'blocked-by-target': '1', 'aborted-cost': '1', 'total': '7',
+    }
+    summary = (tmp_path / 'summary').read_text()
+    assert '| probe_fail | critical |' in summary
+    assert 'Integration scenario' not in summary
 
 
 def test_missing_scan_code_fails_gate(tmp_path):

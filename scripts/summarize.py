@@ -17,19 +17,18 @@ class FindingHeaders(HTMLParser):
     """Only read finding headings, never nested evidence or attacker content."""
     def __init__(self):
         super().__init__()
-        self.depth = 0
-        self.finding_depth = None
+        self.containers = []
         self.heading = False
         self.text = []
         self.findings = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag == 'div':
-            self.depth += 1
-            if attrs.get('class') == 'finding':
-                self.finding_depth = self.depth
-        if tag == 'h3' and self.finding_depth == self.depth:
+        if tag in ('div', 'details', 'summary'):
+            self.containers.append((tag, 'finding' in attrs.get('class', '').split()))
+        finding_header = (self.containers[-1:] == [('div', True)] or
+                          self.containers[-2:] == [('details', True), ('summary', False)])
+        if tag == 'h3' and finding_header:
             self.heading = True
             self.text = []
 
@@ -39,16 +38,14 @@ class FindingHeaders(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag == 'h3' and self.heading:
-            match = re.fullmatch(r'(.+?)\s+—\s+(\w+)\s+·\s+(\w+)\s+·\s+confidence\s+\S+', ''.join(self.text).strip())
+            match = re.fullmatch(r'(.+?)\s+—\s+(\w+)\s+·\s+(\w+)(?:\s+·\s+confidence\s+\S+)?', ''.join(self.text).strip())
             if not match:
                 raise ValueError('HTML finding heading is not supported')
             probe, verdict, severity = match.groups()
             self.findings.append({'probe_id': probe, 'verdict': verdict, 'severity': severity})
             self.heading = False
-        if tag == 'div':
-            if self.finding_depth == self.depth:
-                self.finding_depth = None
-            self.depth -= 1
+        if tag in ('div', 'details', 'summary') and self.containers:
+            self.containers.pop()
 
 
 def read_report(path, format):
@@ -112,13 +109,19 @@ def main():
                     f'{key.replace("_", " ")}: {len(comparison.get(key, []))}'
                     for key in ('new', 'fixed', 'still_failing', 'not_run')), '']
         counts = Counter(f['verdict'] for f in findings)
+        if format == 'sarif':
+            runs = json.loads(report.read_text(encoding='utf-8')).get('runs', [])
+            verdict_counts = runs[0].get('properties', {}).get('verdict_counts') if runs else None
+            if isinstance(verdict_counts, dict):
+                counts = Counter({verdict: verdict_counts.get(verdict, 0) for verdict in VERDICTS})
         if counts.keys() - VERDICTS.keys():
             raise ValueError('Report contains verdicts this action does not recognize')
         values.update({output: str(counts[verdict]) for verdict, output in VERDICTS.items()})
-        values['total'] = str(len(findings))
+        total = sum(counts.values())
+        values['total'] = str(total)
         lines += ['| Verdict | Count |', '|---|---:|']
         lines += [f'| {verdict} | {counts[verdict]} |' for verdict in VERDICTS]
-        lines += [f'| total | {len(findings)} |', '', '### Top failing probes', '']
+        lines += [f'| total | {total} |', '', '### Top failing probes', '']
         failing = sorted((f for f in findings if f['verdict'] == 'fail'),
                          key=lambda f: SEVERITIES.index(f['severity']) if f.get('severity') in SEVERITIES else 99)
         if failing:
@@ -130,7 +133,7 @@ def main():
         lines += [f'Counts unavailable: {safe(exc)}. Check the scan log and report path.']
         print('::warning::Argus counts unavailable; check the job summary and scan log.')
     if format != 'json':
-        lines += ['', 'run.json is unavailable. The installed CLI (1.21.1 by default) writes one format per scan. '
+        lines += ['', 'run.json is unavailable. The installed CLI (1.22.0 by default) writes one format per scan. '
                   'Counts above come from the requested report; a full run record and JSON baseline comparison '
                   'are missing. Use format: json to save a baseline without another scan.']
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
